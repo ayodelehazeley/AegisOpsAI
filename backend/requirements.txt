@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+python-dotenv
+sqlalchemy
+psycopg
+alembic
+pydantic
+pydantic-settings
+python-jose
+passlib
+bcrypt
+redis
+celery
+langchain
+langgraph
+openai
+httpx
