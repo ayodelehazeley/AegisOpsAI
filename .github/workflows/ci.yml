@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Lint
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
+  # ---------------------------------------------------------------------------
+  # Test
+  # ---------------------------------------------------------------------------
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: aegisops
+          POSTGRES_PASSWORD: aegisops_test
+          POSTGRES_DB: aegisops_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U aegisops -d aegisops_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      nats:
+        image: nats:2.10-alpine
+        ports:
+          - 4222:4222
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+
+      - name: Run unit tests
+        run: go test -race -cover -count=1 ./...
+
+      - name: Run integration tests
+        env:
+          AEGISOPS_DATABASE_HOST: localhost
+          AEGISOPS_DATABASE_PORT: "5432"
+          AEGISOPS_DATABASE_USER: aegisops
+          AEGISOPS_DATABASE_PASSWORD: aegisops_test
+          AEGISOPS_DATABASE_NAME: aegisops_test
+          AEGISOPS_DATABASE_SSLMODE: disable
+          AEGISOPS_NATS_URL: "nats://localhost:4222"
+        run: go test -race -tags=integration -count=1 ./...
+
+  # ---------------------------------------------------------------------------
+  # Build
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+
+      - name: Build binary
+        run: |
+          CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/aegisops ./cmd/aegisops
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aegisops-binary
+          path: bin/aegisops
+          retention-days: 7

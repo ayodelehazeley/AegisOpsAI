@@ -1,0 +1,94 @@
+# =============================================================================
+# AegisOpsAI — Local Development Stack
+# =============================================================================
+services:
+  # ---------------------------------------------------------------------------
+  # Application
+  # ---------------------------------------------------------------------------
+  aegisops:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aegisops-app
+    ports:
+      - "8080:8080"
+    environment:
+      AEGIS_SERVER_HOST: "0.0.0.0"
+      AEGIS_SERVER_PORT: "8080"
+      AEGIS_DATABASE_HOST: postgres
+      AEGIS_DATABASE_PORT: "5432"
+      AEGIS_DATABASE_USER: aegisops
+      AEGIS_DATABASE_PASSWORD: aegisops_dev
+      AEGIS_DATABASE_DBNAME: aegisops
+      AEGIS_DATABASE_SSLMODE: disable
+      AEGIS_NATS_URL: "nats://nats:4222"
+      AEGIS_AUTH_JWT_SECRET: "dev-secret-change-in-production"
+      AEGIS_SERVER_MODE: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - aegisops-net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL with pgvector
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: aegisops-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: aegisops
+      POSTGRES_PASSWORD: aegisops_dev
+      POSTGRES_DB: aegisops
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./deployments/docker/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./deployments/docker/02-schema.sql:/docker-entrypoint-initdb.d/02-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegisops -d aegisops"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - aegisops-net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # NATS with JetStream
+  # ---------------------------------------------------------------------------
+  nats:
+    image: nats:2.10-alpine
+    container_name: aegisops-nats
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"   # Client connections
+      - "8222:8222"   # HTTP monitoring
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - aegisops-net
+    restart: unless-stopped
+
+# ---------------------------------------------------------------------------
+# Volumes
+# ---------------------------------------------------------------------------
+volumes:
+  postgres-data:
+    driver: local
+
+# ---------------------------------------------------------------------------
+# Networks
+# ---------------------------------------------------------------------------
+networks:
+  aegisops-net:
+    driver: bridge

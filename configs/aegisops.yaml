@@ -1,0 +1,37 @@
+# AegisOpsAI Configuration
+# Default configuration for local development.
+# Override with environment variables using AEGIS_ prefix.
+# Example: AEGIS_SERVER_PORT=9090
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  mode: "development" # development | production | testing
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "aegisops"
+  password: "aegisops"
+  dbname: "aegisops"
+  sslmode: "disable"
+  max_conns: 25
+
+nats:
+  url: "nats://localhost:4222"
+  cluster_id: "aegisops-cluster"
+
+auth:
+  jwt_secret: "change-me-in-production"
+  token_expiry: "24h"
+
+ai:
+  provider: "openai"    # openai | ollama | anthropic
+  api_key: ""
+  model: "gpt-4"
+  base_url: "https://api.openai.com/v1"
+  enabled: false
+
+telemetry:
+  enabled: false
+  exporter_endpoint: "localhost:4317"

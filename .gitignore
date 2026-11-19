@@ -1,0 +1,38 @@
+# Binaries and build artifacts
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Dependencies
+**/node_modules/
+node_modules/
+
+# IDE & Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs & temp files
+*.log
+tmp/
+.tmp/
+
+# Local configurations & secrets
+*.local.yaml
+.env
+.env.*
+!.env.example
+
+# Test & coverage artifacts
+coverage.txt
+coverage.out
+profile.out
