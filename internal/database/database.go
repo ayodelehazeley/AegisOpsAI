@@ -5,7 +5,7 @@ package database
 
 import (
 	"context"
-	_ "embed"
+	"embed"
 	"fmt"
 	"log/slog"
 	"time"
