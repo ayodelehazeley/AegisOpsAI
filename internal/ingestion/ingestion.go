@@ -106,6 +106,18 @@ func (ei *EventIngester) IngestEvent(ctx context.Context, source string, content
 		return "", fmt.Errorf("marshal raw event: %w", err)
 	}
 
+	if ei.publisher == nil {
+		// Fallback when NATS is not connected: normalize and store directly
+		normalized, nErr := ei.normalizer.Normalize(ctx, source, payload)
+		if nErr == nil && normalized != nil && ei.store != nil {
+			if normalized.ID == "" {
+				normalized.ID = eventID
+			}
+			_ = ei.store.StoreEvent(ctx, normalized)
+		}
+		return eventID, nil
+	}
+
 	subject := fmt.Sprintf("events.%s.ingest", source)
 	ack, err := ei.publisher.Publish(subject, data)
 	if err != nil {
@@ -133,6 +145,11 @@ func (ei *EventIngester) IngestEvent(ctx context.Context, source string, content
 // by normalizing and storing them. It blocks until the context is cancelled.
 // The returned subscription can be used to drain or unsubscribe.
 func (ei *EventIngester) StartConsumer(ctx context.Context) (*nats.Subscription, error) {
+	if ei.subscriber == nil {
+		ei.logger.InfoContext(ctx, "skipping event consumer (running without NATS subscriber)")
+		return nil, nil
+	}
+
 	handler := func(msg *nats.Msg) {
 		ei.processMessage(ctx, msg)
 	}

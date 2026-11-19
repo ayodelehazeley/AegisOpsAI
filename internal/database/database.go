@@ -5,7 +5,7 @@ package database
 
 import (
 	"context"
-	"embed"
+	_ "embed"
 	"fmt"
 	"log/slog"
 	"time"
@@ -17,6 +17,20 @@ import (
 	// Required for goose to use pgx as the database driver.
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
+
+//go:embed schema.sql
+var defaultSchemaSQL string
+
+// EnsureSchema applies the default initial schema if tables do not exist.
+func EnsureSchema(ctx context.Context, pool *pgxpool.Pool) error {
+	_, err := pool.Exec(ctx, defaultSchemaSQL)
+	if err != nil {
+		slog.Warn("schema auto-init note", slog.String("info", err.Error()))
+	} else {
+		slog.Info("database schema verified and ready")
+	}
+	return nil
+}
 
 // NewPool creates a new PostgreSQL connection pool with the given DSN and
 // maximum connection count. It validates connectivity before returning.

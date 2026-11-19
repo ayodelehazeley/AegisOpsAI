@@ -111,12 +111,19 @@ func run() int {
 	}
 	defer dbPool.Close()
 
-	// ── Connect to NATS JetStream ───────────────────────────────────────
-	nc, err := nats.Connect(cfg.NATS.URL,
+	// Automatically ensure database schema & tables exist
+	if err := database.EnsureSchema(ctx, dbPool); err != nil {
+		slog.Warn("database schema check warning", slog.String("error", err.Error()))
+	}
+
+	// ── Connect to NATS JetStream (with fallback for standalone/cloud deployments) ──
+	var nc *nats.Conn
+	var js nats.JetStreamContext
+
+	nc, err = nats.Connect(cfg.NATS.URL,
 		nats.Name("aegisops"),
-		nats.RetryOnFailedConnect(true),
-		nats.MaxReconnects(-1),
-		nats.ReconnectWait(2*time.Second),
+		nats.Timeout(3*time.Second),
+		nats.RetryOnFailedConnect(false),
 		nats.DisconnectErrHandler(func(_ *nats.Conn, err error) {
 			if err != nil {
 				slog.Warn("NATS disconnected", slog.String("error", err.Error()))
@@ -127,22 +134,18 @@ func run() int {
 		}),
 	)
 	if err != nil {
-		slog.Error("failed to connect to NATS", slog.String("error", err.Error()))
-		return 1
-	}
-	defer nc.Close()
-
-	js, err := nc.JetStream()
-	if err != nil {
-		slog.Error("failed to create JetStream context", slog.String("error", err.Error()))
-		return 1
-	}
-
-	slog.Info("NATS JetStream connected", slog.String("url", cfg.NATS.URL))
-
-	// Setup JetStream streams
-	if err := ingestion.SetupStreams(ctx, js, logger); err != nil {
-		slog.Warn("JetStream streams setup warning", slog.String("error", err.Error()))
+		slog.Warn("NATS broker unavailable, running with direct storage pipeline", slog.String("url", cfg.NATS.URL), slog.String("error", err.Error()))
+	} else {
+		defer nc.Close()
+		js, err = nc.JetStream()
+		if err != nil {
+			slog.Warn("failed to create JetStream context", slog.String("error", err.Error()))
+		} else {
+			slog.Info("NATS JetStream connected", slog.String("url", cfg.NATS.URL))
+			if err := ingestion.SetupStreams(ctx, js, logger); err != nil {
+				slog.Warn("JetStream streams setup warning", slog.String("error", err.Error()))
+			}
+		}
 	}
 
 	// ── Instantiate Repositories & Domain Services ──────────────────────

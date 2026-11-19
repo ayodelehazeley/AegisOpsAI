@@ -59,10 +59,9 @@ func (h *HealthHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	// Check NATS connectivity.
 	natsStatus := ComponentStatus{Name: "nats", Status: "healthy"}
 	if h.nc == nil || !h.nc.IsConnected() {
-		natsStatus.Status = "unhealthy"
-		natsStatus.Message = "NATS is not connected"
-		overall = "unhealthy"
-		h.logger.Error("health check: NATS not connected")
+		natsStatus.Status = "degraded"
+		natsStatus.Message = "NATS broker not connected (using direct pipeline)"
+		h.logger.Debug("health check: NATS running in degraded/direct mode")
 	}
 	components = append(components, natsStatus)
 

@@ -5,6 +5,8 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,6 +32,7 @@ type ServerConfig struct {
 
 // DatabaseConfig holds PostgreSQL connection settings.
 type DatabaseConfig struct {
+	URL      string `mapstructure:"url"`
 	Host     string `mapstructure:"host"`
 	Port     int    `mapstructure:"port"`
 	User     string `mapstructure:"user"`
@@ -39,8 +42,18 @@ type DatabaseConfig struct {
 	MaxConns int32  `mapstructure:"max_conns"`
 }
 
-// DSN returns a PostgreSQL connection string built from the database configuration.
+// DSN returns a PostgreSQL connection string built from the database configuration
+// or standard environment variables (DATABASE_URL / AEGIS_DATABASE_URL).
 func (d DatabaseConfig) DSN() string {
+	if d.URL != "" {
+		return d.URL
+	}
+	if envURL := os.Getenv("DATABASE_URL"); envURL != "" {
+		return envURL
+	}
+	if envURL := os.Getenv("AEGIS_DATABASE_URL"); envURL != "" {
+		return envURL
+	}
 	return fmt.Sprintf(
 		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
 		d.User, d.Password, d.Host, d.Port, d.DBName, d.SSLMode,
@@ -104,7 +117,7 @@ func Load() (*Config, error) {
 	// Explicitly bind env vars for clean struct unmarshaling
 	for _, k := range []string{
 		"server.host", "server.port", "server.mode",
-		"database.host", "database.port", "database.user", "database.password",
+		"database.url", "database.host", "database.port", "database.user", "database.password",
 		"database.dbname", "database.sslmode", "database.max_conns",
 		"nats.url", "nats.cluster_id",
 		"auth.jwt_secret", "auth.token_expiry",
@@ -124,6 +137,16 @@ func Load() (*Config, error) {
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("unmarshalling config: %w", err)
+	}
+
+	// Cloud platform overrides (Render, Heroku, Cloud Run)
+	if portStr := os.Getenv("PORT"); portStr != "" {
+		if p, err := strconv.Atoi(portStr); err == nil && p > 0 {
+			cfg.Server.Port = p
+		}
+	}
+	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
+		cfg.NATS.URL = natsURL
 	}
 
 	return &cfg, nil
