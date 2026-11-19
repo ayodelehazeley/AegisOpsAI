@@ -4,12 +4,14 @@ import {
   CheckCircle2,
   Database,
   Flame,
+  Globe,
   Radio,
   RefreshCw,
   Server,
+  Settings,
   Zap,
 } from 'lucide-react';
-import { api } from '../api/client';
+import { api, getApiBaseUrl, setApiBaseUrl } from '../api/client';
 import { SystemHealth } from '../types';
 
 interface NavbarProps {
@@ -21,6 +23,15 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ health, onRefresh, onEventSimulated }) => {
   const [simulating, setSimulating] = useState(false);
   const [showSimModal, setShowSimModal] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [customUrl, setCustomUrl] = useState(getApiBaseUrl());
+
+  const handleSaveBackendUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    setApiBaseUrl(customUrl);
+    setShowConfigModal(false);
+    onRefresh();
+  };
 
   const simulateIncident = async (type: 'disk' | 'memory' | 'latency') => {
     setSimulating(true);
@@ -114,7 +125,28 @@ export const Navbar: React.FC<NavbarProps> = ({ health, onRefresh, onEventSimula
       </div>
 
       {/* Action Controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {/* Backend Endpoint Button */}
+        <button
+          onClick={() => {
+            setCustomUrl(getApiBaseUrl());
+            setShowConfigModal(true);
+          }}
+          className="btn btn-secondary"
+          style={{
+            padding: '0.4rem 0.75rem',
+            fontSize: '0.8rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            border: `1px solid ${health ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+          }}
+          title="Configure Go Backend URL"
+        >
+          <Globe size={14} color={health ? '#34d399' : '#f87171'} />
+          <span>{health ? 'Backend: Connected' : 'Set Backend URL'}</span>
+        </button>
+
         {/* Simulate Incident Button */}
         <button
           onClick={() => setShowSimModal(true)}
@@ -135,6 +167,63 @@ export const Navbar: React.FC<NavbarProps> = ({ health, onRefresh, onEventSimula
           <RefreshCw size={16} />
         </button>
       </div>
+
+      {/* Backend Config Modal */}
+      {showConfigModal && (
+        <div className="modal-overlay" onClick={() => setShowConfigModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px', padding: '1.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+              <Globe size={22} color="var(--accent-cyan)" />
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 600 }}>Backend API Connection</h3>
+            </div>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+              Specify your deployed Go backend URL (e.g., your Render service URL). When hosted on Vercel, requests will be routed to this endpoint.
+            </p>
+
+            <form onSubmit={handleSaveBackendUrl}>
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem' }}>
+                  Backend Service URL
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://aegisopsai.onrender.com"
+                  value={customUrl}
+                  onChange={(e) => setCustomUrl(e.target.value)}
+                  style={{
+                    width: '100%',
+                    background: 'var(--bg-primary)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '0.4rem',
+                    padding: '0.6rem 0.75rem',
+                    color: '#fff',
+                    fontSize: '0.875rem',
+                  }}
+                />
+                <span style={{ display: 'block', marginTop: '0.35rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Leave blank to use the origin server or VITE_API_URL environment variable.
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowConfigModal(false)}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                >
+                  Save & Connect
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Simulation Modal */}
       {showSimModal && (

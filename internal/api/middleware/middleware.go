@@ -135,7 +135,7 @@ func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {
 }
 
 // CORS returns middleware that sets Cross-Origin Resource Sharing headers.
-// For production use, allowedOrigins should be configured explicitly.
+// For production use, allowedOrigins can be configured explicitly.
 func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 	originsSet := make(map[string]struct{}, len(allowedOrigins))
 	for _, o := range allowedOrigins {
@@ -148,14 +148,20 @@ func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 			origin := r.Header.Get("Origin")
 
 			if allowAll {
-				w.Header().Set("Access-Control-Allow-Origin", "*")
+				if origin != "" {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					w.Header().Set("Vary", "Origin")
+				} else {
+					w.Header().Set("Access-Control-Allow-Origin", "*")
+				}
 			} else if _, ok := originsSet[origin]; ok {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 				w.Header().Set("Vary", "Origin")
 			}
 
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-Request-ID")
+			w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-Request-ID, Origin, X-Requested-With")
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			w.Header().Set("Access-Control-Max-Age", "3600")
 
 			// Handle preflight requests.

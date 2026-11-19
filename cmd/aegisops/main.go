@@ -20,6 +20,7 @@ import (
 	"github.com/nats-io/nats.go"
 
 	"github.com/AegisOpsAI/aegisops/internal/api/handlers"
+	appMiddleware "github.com/AegisOpsAI/aegisops/internal/api/middleware"
 	"github.com/AegisOpsAI/aegisops/internal/api/routes"
 	"github.com/AegisOpsAI/aegisops/internal/audit"
 	"github.com/AegisOpsAI/aegisops/internal/auth"
@@ -204,6 +205,7 @@ func run() int {
 	// Global middleware stack.
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
+	r.Use(appMiddleware.CORS(nil))
 	r.Use(slogMiddleware)
 	r.Use(middleware.Recoverer)
 

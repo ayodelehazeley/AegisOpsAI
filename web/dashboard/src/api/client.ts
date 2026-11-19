@@ -11,8 +11,24 @@ import {
 
 let authToken = localStorage.getItem('aegisops_token') || '';
 
-// Base API URL from environment variable (for Vercel or external hosting)
-const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+// Base API URL from environment variable or localStorage override
+const envApiUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
+export function getApiBaseUrl(): string {
+  const custom = localStorage.getItem('aegisops_api_url');
+  if (custom !== null && custom !== undefined && custom.trim() !== '') {
+    return custom.trim().replace(/\/$/, '');
+  }
+  return envApiUrl;
+}
+
+export function setApiBaseUrl(url: string) {
+  if (url && url.trim()) {
+    localStorage.setItem('aegisops_api_url', url.trim().replace(/\/$/, ''));
+  } else {
+    localStorage.removeItem('aegisops_api_url');
+  }
+}
 
 export function setAuthToken(token: string) {
   authToken = token;
@@ -31,9 +47,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-  const url = API_BASE_URL ? `${API_BASE_URL}${normalizedPath}` : normalizedPath;
+  const baseUrl = getApiBaseUrl();
+  const url = baseUrl ? `${baseUrl}${normalizedPath}` : normalizedPath;
 
-  const res = await fetch(url, { ...options, headers });
+  let res: Response;
+  try {
+    res = await fetch(url, { ...options, headers });
+  } catch (err: any) {
+    const target = baseUrl || window.location.origin;
+    throw new Error(
+      `Cannot connect to backend at "${target}". Make sure your Go backend is running and the backend URL is configured.`
+    );
+  }
+
   if (!res.ok) {
     let errMessage = `HTTP ${res.status}`;
     try {
