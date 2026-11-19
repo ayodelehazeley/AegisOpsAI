@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/((?!api/|integrations/|healthz).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

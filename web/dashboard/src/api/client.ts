@@ -11,6 +11,9 @@ import {
 
 let authToken = localStorage.getItem('aegisops_token') || '';
 
+// Base API URL from environment variable (for Vercel or external hosting)
+const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
 export function setAuthToken(token: string) {
   authToken = token;
   localStorage.setItem('aegisops_token', token);
@@ -27,7 +30,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers.set('Authorization', `Bearer ${authToken}`);
   }
 
-  const res = await fetch(path, { ...options, headers });
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  const url = API_BASE_URL ? `${API_BASE_URL}${normalizedPath}` : normalizedPath;
+
+  const res = await fetch(url, { ...options, headers });
   if (!res.ok) {
     let errMessage = `HTTP ${res.status}`;
     try {
